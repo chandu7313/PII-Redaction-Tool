@@ -107,3 +107,10 @@ class TestIPReplacement:
         assert ":" in result
 
 
+class TestCompanyReplacement:
+    def test_generates_company(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("COMPANY", "Acme Corp.")
+        assert result != "Acme Corp."
+        assert len(result) > 0
+
+
