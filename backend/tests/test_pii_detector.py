@@ -85,3 +85,18 @@ class TestCreditCardDetection:
         assert len(cards) >= 1
 
 
+class TestIPAddressDetection:
+    def test_ipv4(self):
+        text = "Server IP: 192.168.1.100"
+        entities = detect_pii(text)
+        ips = [e for e in entities if e.type == "IP_ADDRESS"]
+        assert len(ips) == 1
+        assert ips[0].value == "192.168.1.100"
+
+    def test_ipv4_boundary(self):
+        text = "Access from 255.255.255.255 detected."
+        entities = detect_pii(text)
+        ips = [e for e in entities if e.type == "IP_ADDRESS"]
+        assert len(ips) == 1
+
+
