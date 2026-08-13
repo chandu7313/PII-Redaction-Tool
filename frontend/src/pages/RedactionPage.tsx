@@ -193,3 +193,24 @@ export default function RedactionPage() {
                 </div>
 
                 {/* Replacement */}
+                <div className="md:col-span-3">
+                  <input
+                    className="w-full bg-transparent border-0 border-b border-outline-variant p-0 font-code text-code-sm text-outline focus:ring-0 focus:outline-none focus:border-ink px-1 py-0.5"
+                    type="text"
+                    value={entity.replacement}
+                    onChange={(e) => handleUpdateReplacement(entity.id, e.target.value)}
+                  />
+                </div>
+
+                {/* Confidence */}
+                <div className="md:col-span-2">
+                  <ConfidenceBar value={entity.confidence * 100} />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mx-4 mt-4 border-2 border-stamp-red bg-error-container p-3 font-code text-code-sm text-on-error-container">
