@@ -52,3 +52,16 @@ class TestPhoneReplacement:
         assert result.startswith("+")
 
 
+class TestSSNReplacement:
+    def test_dashed_ssn(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("SSN", "123-45-6789")
+        assert len(result) == 11
+        assert result.count("-") == 2
+        assert result != "123-45-6789"
+
+    def test_plain_ssn(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("SSN", "123456789")
+        assert "-" not in result
+        assert len(result) == 9
+
+
