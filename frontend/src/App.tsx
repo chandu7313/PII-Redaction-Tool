@@ -24,3 +24,4 @@ export default function App() {
         {/* All other pages share the standard layout */}
         <Route element={<Layout />}>
           <Route path="/" element={<UploadPage />} />
+          <Route path="/redaction/:id" element={<RedactionPage />} />
