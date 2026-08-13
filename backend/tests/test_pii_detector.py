@@ -162,3 +162,16 @@ class TestCompanyDetection:
         assert len(companies) >= 1
 
 
+class TestOverlapResolution:
+    def test_no_duplicate_overlaps(self):
+        text = "Dr. John Smith's SSN is 123-45-6789 and email is john@test.com"
+        entities = detect_pii(text)
+        # Ensure no two entities overlap
+        for i in range(len(entities) - 1):
+            for j in range(i + 1, len(entities)):
+                assert (
+                    entities[i].end <= entities[j].start
+                    or entities[j].end <= entities[i].start
+                ), f"Overlap: {entities[i]} and {entities[j]}"
+
+
