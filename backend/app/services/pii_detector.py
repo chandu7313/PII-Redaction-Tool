@@ -200,3 +200,25 @@ def _luhn_check(number: str) -> bool:
     return checksum % 10 == 0
 
 
+def _remove_overlapping(entities: list[DetectedEntity]) -> list[DetectedEntity]:
+    """Remove overlapping entities, keeping the one with higher confidence."""
+    if not entities:
+        return []
+
+    # Sort by start position, then by confidence (descending)
+    sorted_entities = sorted(entities, key=lambda e: (e.start, -e.confidence))
+    result = [sorted_entities[0]]
+
+    for entity in sorted_entities[1:]:
+        last = result[-1]
+        # Check for overlap
+        if entity.start < last.end:
+            # Keep the one with higher confidence
+            if entity.confidence > last.confidence:
+                result[-1] = entity
+        else:
+            result.append(entity)
+
+    return result
+
+
