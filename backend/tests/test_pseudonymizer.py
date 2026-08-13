@@ -29,3 +29,11 @@ class TestPersonReplacement:
         assert r1 == r2
 
 
+class TestEmailReplacement:
+    def test_generates_valid_email(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("EMAIL", "john@example.com")
+        assert "@" in result
+        assert "." in result.split("@")[1]
+        assert result != "john@example.com"
+
+
