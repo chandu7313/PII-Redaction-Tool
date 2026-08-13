@@ -114,3 +114,16 @@ class TestCompanyReplacement:
         assert len(result) > 0
 
 
+class TestAddressReplacement:
+    def test_street_address(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement(
+            "ADDRESS", "123 Main Street, Springfield, IL 62704"
+        )
+        assert result != "123 Main Street, Springfield, IL 62704"
+        assert len(result) > 0
+
+    def test_po_box(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("ADDRESS", "P.O. Box 1234")
+        assert "P.O. Box" in result
+
+
