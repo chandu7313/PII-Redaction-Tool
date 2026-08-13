@@ -52,3 +52,9 @@ class UploadResponse(BaseModel):
     stats: RedactionStats
 
 
+class DownloadResponse(BaseModel):
+    """Metadata for a downloadable redacted document."""
+    job_id: str
+    filename: str
+    download_url: str
+
