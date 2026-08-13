@@ -37,3 +37,18 @@ class TestEmailReplacement:
         assert result != "john@example.com"
 
 
+class TestPhoneReplacement:
+    def test_parenthesized_format(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("PHONE", "(555) 867-5309")
+        assert result.startswith("(")
+        assert result != "(555) 867-5309"
+
+    def test_dashed_format(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("PHONE", "555-867-5309")
+        assert "-" in result
+
+    def test_international_format(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("PHONE", "+1-800-555-0199")
+        assert result.startswith("+")
+
+
