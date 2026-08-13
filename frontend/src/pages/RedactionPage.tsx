@@ -93,3 +93,26 @@ export default function RedactionPage() {
   return (
     <div className="p-margin relative min-h-full">
       {/* Header */}
+      <header className="mb-gutter flex flex-col sm:flex-row justify-between items-start gap-4 border-b-2 border-ink pb-4">
+        <div>
+          <h2 className="font-headline text-headline-lg text-ink uppercase">
+            REDACTION WORKSHEET — CASE #{jobId?.toUpperCase()}
+          </h2>
+          <div className="mt-2 text-on-surface-variant font-code text-code-sm">
+            GENERATED: {new Date().toISOString().slice(0, 19)}Z | FILE: {data.filename}
+          </div>
+        </div>
+        <StatusChip
+          label={`ENTITIES FOUND: ${entities.length} — TYPES: ${Object.keys(typeCounts).length - 1}`}
+          variant="danger"
+          rotation={2}
+        />
+      </header>
+
+      {/* Document Container */}
+      <div className="border border-ink bg-fresh-paper relative pb-16 mt-10 shadow-[4px_4px_0px_rgba(28,27,25,0.1)]">
+        {/* Folder Tabs */}
+        <div className="flex flex-wrap absolute -top-8 left-0">
+          {visibleTabs.map((tab) => (
+            <button
+              key={tab}
