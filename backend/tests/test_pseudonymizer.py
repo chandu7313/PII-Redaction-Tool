@@ -75,3 +75,22 @@ class TestCreditCardReplacement:
         assert " " in result
 
 
+class TestDOBReplacement:
+    def test_us_format(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("DOB", "03/15/1990")
+        assert "/" in result
+        assert len(result) == 10
+
+    def test_iso_format(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("DOB", "1990-03-15")
+        assert "-" in result
+        assert result[:4].isdigit()
+
+    def test_written_format(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("DOB", "January 15, 1990")
+        assert any(month in result for month in [
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        ])
+
+
