@@ -71,3 +71,17 @@ class TestPhoneDetection:
         assert len(phones) >= 1
 
 
+class TestCreditCardDetection:
+    def test_visa(self):
+        text = "Card: 4111-1111-1111-1111"
+        entities = detect_pii(text)
+        cards = [e for e in entities if e.type == "CREDIT_CARD"]
+        assert len(cards) >= 1
+
+    def test_mastercard_with_spaces(self):
+        text = "Payment card 5500 0000 0000 0004"
+        entities = detect_pii(text)
+        cards = [e for e in entities if e.type == "CREDIT_CARD"]
+        assert len(cards) >= 1
+
+
