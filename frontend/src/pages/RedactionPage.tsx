@@ -116,3 +116,24 @@ export default function RedactionPage() {
           {visibleTabs.map((tab) => (
             <button
               key={tab}
+              className={`
+                px-4 md:px-6 py-2 font-label text-label-caps font-bold
+                border border-ink transition-colors text-sm
+                ${
+                  activeFilter === tab
+                    ? 'folder-tab-active bg-fresh-paper text-ink border-b-0 h-9'
+                    : 'bg-surface-dim text-olive hover:bg-surface-container-high h-8 mt-1'
+                }
+                ${tab !== visibleTabs[0] ? 'border-l-0' : ''}
+              `}
+              onClick={() => setActiveFilter(tab)}
+            >
+              {TYPE_LABELS[tab] || tab}
+              {typeCounts[tab] ? ` (${typeCounts[tab]})` : ''}
+            </button>
+          ))}
+        </div>
+
+        {/* Ledger Table */}
+        <div className="w-full pt-4 px-4 min-h-[400px]">
+          {/* Table Header */}
