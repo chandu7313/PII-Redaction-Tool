@@ -65,3 +65,13 @@ class TestSSNReplacement:
         assert len(result) == 9
 
 
+class TestCreditCardReplacement:
+    def test_dashed_card(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("CREDIT_CARD", "4111-1111-1111-1111")
+        assert result.count("-") == 3
+
+    def test_spaced_card(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("CREDIT_CARD", "4111 1111 1111 1111")
+        assert " " in result
+
+
