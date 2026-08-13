@@ -1,0 +1,74 @@
+import { useState, useMemo } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import ConfidenceBar from '../components/ConfidenceBar';
+import StatusChip from '../components/StatusChip';
+import { commitRedactions } from '../services/api';
+import type { PIIEntity, UploadResponse } from '../types';
+
+const FILTER_TABS = ['ALL', 'PERSON', 'EMAIL', 'PHONE', 'SSN', 'CREDIT_CARD', 'DOB', 'IP_ADDRESS', 'COMPANY', 'ADDRESS'];
+
+const TYPE_LABELS: Record<string, string> = {
+  PERSON: 'PERSON',
+  EMAIL: 'EMAIL',
+  PHONE: 'PHONE',
+  SSN: 'SSN',
+  CREDIT_CARD: 'CC#',
+  DOB: 'DOB',
+  IP_ADDRESS: 'IP',
+  COMPANY: 'ORG',
+  ADDRESS: 'ADDR',
+};
+
+export default function RedactionPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { id: jobId } = useParams<{ id: string }>();
+  const data = location.state as UploadResponse | undefined;
+
+  const [activeFilter, setActiveFilter] = useState('ALL');
+  const [entities, setEntities] = useState<PIIEntity[]>(data?.entities ?? []);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const filteredEntities = useMemo(() => {
+    if (activeFilter === 'ALL') return entities;
+    return entities.filter((e) => e.type === activeFilter);
+  }, [entities, activeFilter]);
+
+  // Get counts for tabs
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: entities.length };
+    for (const entity of entities) {
+      counts[entity.type] = (counts[entity.type] || 0) + 1;
+    }
+    return counts;
+  }, [entities]);
+
+  // Only show tabs that have entities
+  const visibleTabs = FILTER_TABS.filter(
+    (tab) => tab === 'ALL' || (typeCounts[tab] && typeCounts[tab] > 0)
+  );
+
+  const handleCommit = async () => {
+    if (!jobId) return;
+    setIsCommitting(true);
+    setError(null);
+
+    try {
+      const result = await commitRedactions(jobId, entities);
+      navigate(`/release/${jobId}`, { state: result });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Redaction failed');
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
+  const handleUpdateReplacement = (entityId: number, newReplacement: string) => {
+    setEntities((prev) =>
+      prev.map((e) => (e.id === entityId ? { ...e, replacement: newReplacement } : e))
+    );
+  };
+
+  if (!data) {
+    return (
