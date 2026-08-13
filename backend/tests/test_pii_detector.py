@@ -100,3 +100,23 @@ class TestIPAddressDetection:
         assert len(ips) == 1
 
 
+class TestDOBDetection:
+    def test_us_format(self):
+        text = "Date of birth: 03/15/1990"
+        entities = detect_pii(text)
+        dobs = [e for e in entities if e.type == "DOB"]
+        assert len(dobs) == 1
+
+    def test_iso_format(self):
+        text = "Born: 1985-07-22"
+        entities = detect_pii(text)
+        dobs = [e for e in entities if e.type == "DOB"]
+        assert len(dobs) == 1
+
+    def test_written_format(self):
+        text = "Birthday is January 15, 1990."
+        entities = detect_pii(text)
+        dobs = [e for e in entities if e.type == "DOB"]
+        assert len(dobs) == 1
+
+
