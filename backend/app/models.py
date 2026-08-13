@@ -42,3 +42,13 @@ class RedactionRequest(BaseModel):
     entities: list[PIIEntity]
 
 
+class UploadResponse(BaseModel):
+    """Response from document upload and PII detection."""
+    job_id: str
+    filename: str
+    entities: list[PIIEntity]
+    original_text: str
+    redacted_text: str
+    stats: RedactionStats
+
+
