@@ -137,3 +137,31 @@ export default function RedactionPage() {
         {/* Ledger Table */}
         <div className="w-full pt-4 px-4 min-h-[400px]">
           {/* Table Header */}
+          <div className="hidden md:grid grid-cols-12 gap-4 pb-2 border-b-2 border-ink font-label text-label-caps font-bold">
+            <div className="col-span-1 text-center">ID</div>
+            <div className="col-span-2">TYPE</div>
+            <div className="col-span-4">ORIGINAL</div>
+            <div className="col-span-3">REPLACEMENT</div>
+            <div className="col-span-2">CONFIDENCE</div>
+          </div>
+
+          {/* Table Rows */}
+          {filteredEntities.length === 0 ? (
+            <div className="py-12 text-center">
+              <span className="material-symbols-outlined text-4xl text-outline mb-2 block">search_off</span>
+              <p className="font-code text-code-sm text-outline">
+                No entities found for this filter.
+              </p>
+            </div>
+          ) : (
+            filteredEntities.map((entity) => (
+              <div
+                key={entity.id}
+                className={`
+                  grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4
+                  py-3 border-b border-dashed border-outline-variant
+                  ledger-row items-center font-code text-code-sm
+                  ${entity.confidence < 0.70 ? 'bg-[#ffdad4]/20' : ''}
+                `}
+              >
+                {/* ID */}
