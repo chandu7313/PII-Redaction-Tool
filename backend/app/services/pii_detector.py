@@ -174,3 +174,13 @@ def _get_context(text: str, start: int, end: int, window: int = 80) -> str:
     return text[ctx_start:ctx_end]
 
 
+def _check_context_boost(text: str, start: int, end: int, entity_type: str) -> float:
+    """Check if surrounding context contains keywords that boost confidence."""
+    context = _get_context(text, start, end, window=120).lower()
+    boosters = CONTEXT_BOOSTERS.get(entity_type, [])
+    for keyword in boosters:
+        if keyword in context:
+            return CONTEXT_BOOST
+    return 0.0
+
+
