@@ -167,3 +167,10 @@ CONTEXT_BOOST = 0.10
 MAX_CONFIDENCE = 1.0
 
 
+def _get_context(text: str, start: int, end: int, window: int = 80) -> str:
+    """Extract surrounding context for a match."""
+    ctx_start = max(0, start - window)
+    ctx_end = min(len(text), end + window)
+    return text[ctx_start:ctx_end]
+
+
