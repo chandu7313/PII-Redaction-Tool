@@ -175,3 +175,30 @@ class TestOverlapResolution:
                 ), f"Overlap: {entities[i]} and {entities[j]}"
 
 
+class TestEdgeCases:
+    def test_empty_string(self):
+        entities = detect_pii("")
+        assert entities == []
+
+    def test_no_pii(self):
+        text = "The quick brown fox jumps over the lazy dog."
+        entities = detect_pii(text)
+        # Should have very few or no entities
+        assert all(e.confidence < 0.90 for e in entities)
+
+    def test_multiple_types(self):
+        text = (
+            "Employee John Doe (john@acme.com, SSN 123-45-6789) "
+            "works at Acme Corp. Phone: (555) 123-4567. "
+            "DOB: 03/15/1990. IP: 10.0.0.1. "
+            "CC: 4111-1111-1111-1111. "
+            "Address: 123 Main Street, Anytown, CA 90210"
+        )
+        entities = detect_pii(text)
+        types_found = {e.type for e in entities}
+        # Should detect most types
+        assert "EMAIL" in types_found
+        assert "SSN" in types_found
+        assert "PHONE" in types_found
+        assert "IP_ADDRESS" in types_found
+
