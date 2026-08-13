@@ -72,3 +72,24 @@ export default function RedactionPage() {
 
   if (!data) {
     return (
+      <div className="p-margin flex items-center justify-center min-h-full">
+        <div className="border-2 border-ink p-8 bg-fresh-paper text-center">
+          <span className="material-symbols-outlined text-5xl text-outline mb-4 block">folder_off</span>
+          <h2 className="font-headline text-headline-md uppercase mb-2">NO ACTIVE CASE</h2>
+          <p className="font-code text-code-sm text-outline mb-6">
+            Upload a document to begin redaction analysis.
+          </p>
+          <button
+            className="border-2 border-ink px-6 py-2 font-label text-label-caps font-bold hover:bg-surface-variant transition-colors uppercase"
+            onClick={() => navigate('/')}
+          >
+            RETURN TO INTAKE
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-margin relative min-h-full">
+      {/* Header */}
