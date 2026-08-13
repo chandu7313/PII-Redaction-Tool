@@ -26,3 +26,13 @@ class RedactionStats(BaseModel):
     processing_time_ms: float
 
 
+class RedactionResult(BaseModel):
+    """Complete result of PII detection on a document."""
+    job_id: str
+    filename: str
+    original_text: str
+    redacted_text: str
+    entities: list[PIIEntity]
+    stats: RedactionStats
+
+
