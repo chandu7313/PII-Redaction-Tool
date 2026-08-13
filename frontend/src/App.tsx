@@ -22,3 +22,4 @@ export default function App() {
         <Route path="/report/:id" element={<ReportPage />} />
 
         {/* All other pages share the standard layout */}
+        <Route element={<Layout />}>
