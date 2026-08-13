@@ -25,3 +25,43 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<UploadPage />} />
           <Route path="/redaction/:id" element={<RedactionPage />} />
+          <Route path="/release/:id" element={<ReleasePage />} />
+
+          {/* Placeholder routes for nav items */}
+          <Route
+            path="/archive"
+            element={<PlaceholderPage icon="inventory_2" title="ARCHIVE" />}
+          />
+          <Route
+            path="/evidence"
+            element={<PlaceholderPage icon="menu_book" title="EVIDENCE LOG" />}
+          />
+          <Route
+            path="/settings"
+            element={<PlaceholderPage icon="settings" title="SETTINGS" />}
+          />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+/** Simple placeholder for nav routes that aren't the core flow */
+function PlaceholderPage({ icon, title }: { icon: string; title: string }) {
+  return (
+    <div className="p-margin flex items-center justify-center min-h-full">
+      <div className="border-2 border-dashed border-outline p-12 bg-fresh-paper text-center">
+        <span className="material-symbols-outlined text-6xl text-outline mb-4 block">
+          {icon}
+        </span>
+        <h2 className="font-headline text-headline-md uppercase mb-2 text-ink">
+          {title}
+        </h2>
+        <p className="font-code text-code-sm text-outline">
+          This section is under development.
+        </p>
+      </div>
+    </div>
+  );
+}
+
