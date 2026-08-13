@@ -165,3 +165,31 @@ export default function RedactionPage() {
                 `}
               >
                 {/* ID */}
+                <div className="col-span-1 text-center text-outline hidden md:block">
+                  {String(entity.id).padStart(3, '0')}
+                </div>
+
+                {/* Type */}
+                <div className="md:col-span-2 flex items-center gap-2">
+                  <span className="md:hidden font-label text-label-caps text-outline">
+                    #{String(entity.id).padStart(3, '0')}
+                  </span>
+                  <span className="border border-olive text-olive px-2 py-0.5 text-xs font-bold uppercase">
+                    {TYPE_LABELS[entity.type] || entity.type}
+                  </span>
+                </div>
+
+                {/* Original */}
+                <div className="md:col-span-4 flex items-center gap-1">
+                  <span className="redaction-block">{entity.original}</span>
+                  {entity.confidence < 0.70 && (
+                    <span
+                      className="material-symbols-outlined text-stamp-red text-sm ml-1"
+                      title="Review Recommended"
+                    >
+                      warning
+                    </span>
+                  )}
+                </div>
+
+                {/* Replacement */}
