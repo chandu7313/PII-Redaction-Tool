@@ -184,3 +184,19 @@ def _check_context_boost(text: str, start: int, end: int, entity_type: str) -> f
     return 0.0
 
 
+def _luhn_check(number: str) -> bool:
+    """Validate a credit card number using the Luhn algorithm."""
+    digits = [int(d) for d in number if d.isdigit()]
+    if len(digits) < 13 or len(digits) > 19:
+        return False
+    checksum = 0
+    reverse_digits = digits[::-1]
+    for i, d in enumerate(reverse_digits):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        checksum += d
+    return checksum % 10 == 0
+
+
