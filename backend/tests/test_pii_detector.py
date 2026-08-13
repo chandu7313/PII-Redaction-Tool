@@ -148,3 +148,17 @@ class TestPersonDetection:
         assert len(persons) >= 1
 
 
+class TestCompanyDetection:
+    def test_company_with_inc(self):
+        text = "Working at Acme Corporation Inc."
+        entities = detect_pii(text)
+        companies = [e for e in entities if e.type == "COMPANY"]
+        assert len(companies) >= 1
+
+    def test_company_with_llc(self):
+        text = "Filed by Smith & Associates LLC"
+        entities = detect_pii(text)
+        companies = [e for e in entities if e.type == "COMPANY"]
+        assert len(companies) >= 1
+
+
