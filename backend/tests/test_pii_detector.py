@@ -134,3 +134,17 @@ class TestAddressDetection:
         assert len(addresses) == 1
 
 
+class TestPersonDetection:
+    def test_titled_name(self):
+        text = "Dr. Jane Smith reviewed the case."
+        entities = detect_pii(text)
+        persons = [e for e in entities if e.type == "PERSON"]
+        assert len(persons) >= 1
+
+    def test_two_word_name(self):
+        text = "Contact person is John Doe."
+        entities = detect_pii(text)
+        persons = [e for e in entities if e.type == "PERSON"]
+        assert len(persons) >= 1
+
+
