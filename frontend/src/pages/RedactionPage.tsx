@@ -245,3 +245,14 @@ export default function RedactionPage() {
       </div>
 
       {/* Stats footer */}
+      <div className="mt-6 flex flex-wrap gap-4 font-code text-code-sm text-outline">
+        <span>TOTAL: {data.stats.total_entities} entities</span>
+        <span>|</span>
+        <span>AVG CONFIDENCE: {(data.stats.avg_confidence * 100).toFixed(0)}%</span>
+        <span>|</span>
+        <span>PROCESSED IN: {data.stats.processing_time_ms.toFixed(0)}ms</span>
+      </div>
+    </div>
+  );
+}
+
