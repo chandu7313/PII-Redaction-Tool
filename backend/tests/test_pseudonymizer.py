@@ -127,3 +127,11 @@ class TestAddressReplacement:
         assert "P.O. Box" in result
 
 
+class TestSessionReset:
+    def test_reset_clears_cache(self, pseudonymizer):
+        r1 = pseudonymizer.generate_replacement("PERSON", "Test Name")
+        pseudonymizer.reset()
+        # After reset, a new name may be generated (depending on Faker state)
+        # But at minimum, the cache should be cleared
+        assert len(pseudonymizer._cache) == 0
+
