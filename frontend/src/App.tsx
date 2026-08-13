@@ -19,3 +19,6 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Report page has its own layout (matching Stitch design) */}
+        <Route path="/report/:id" element={<ReportPage />} />
+
+        {/* All other pages share the standard layout */}
