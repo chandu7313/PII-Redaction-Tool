@@ -51,3 +51,23 @@ class TestSSNDetection:
         assert ssns[0].confidence > 0.95  # Context boost applied
 
 
+class TestPhoneDetection:
+    def test_parenthesized_phone(self):
+        text = "Call (555) 867-5309 for info."
+        entities = detect_pii(text)
+        phones = [e for e in entities if e.type == "PHONE"]
+        assert len(phones) >= 1
+
+    def test_dashed_phone(self):
+        text = "Phone: 555-123-4567"
+        entities = detect_pii(text)
+        phones = [e for e in entities if e.type == "PHONE"]
+        assert len(phones) >= 1
+
+    def test_international_phone(self):
+        text = "Reach us at +1-800-555-0199."
+        entities = detect_pii(text)
+        phones = [e for e in entities if e.type == "PHONE"]
+        assert len(phones) >= 1
+
+
