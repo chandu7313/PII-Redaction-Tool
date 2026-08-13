@@ -18,3 +18,11 @@ class PIIEntity(BaseModel):
     context: Optional[str] = None  # surrounding text for review
 
 
+class RedactionStats(BaseModel):
+    """Summary statistics for a redaction job."""
+    total_entities: int
+    entities_by_type: dict[str, int]
+    avg_confidence: float
+    processing_time_ms: float
+
+
