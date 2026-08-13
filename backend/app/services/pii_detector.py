@@ -1,225 +1,128 @@
 """
-PII Detection Engine.
+PII Detection Engine — v2.
 
-Uses regex patterns with context-aware scoring to detect 9 types of PII:
-- Full names
-- Email addresses
-- Phone numbers
-- Company names
-- Physical/mailing addresses
-- Social Security Numbers (SSNs)
-- Credit card numbers
-- Dates of birth
-- IP addresses
+Multi-phase pipeline architecture:
+
+  Phase 1 — Section Detection:
+    Identify document sections (HEADER, SKILLS, PROJECTS, EDUCATION, etc.)
+
+  Phase 2 — Structured PII Detection:
+    Run deterministic recognizers (Email, Phone, SSN, CC, IP, URL).
+    Collect "protected spans" that later recognizers must not overlap.
+
+  Phase 3 — Context-Aware PII Detection:
+    Run context-aware recognizers (Person, Company, Address, DOB).
+    Uses section context and protected spans to avoid false positives.
+
+  Phase 4 — Overlap Resolution:
+    Deterministic conflict resolution:
+      1. Prefer longer valid entity span
+      2. Prefer higher confidence
+      3. Prefer structured over contextual
+
+  Phase 5 — Span Verification:
+    assert text[start:end] == entity.value for every entity.
+    If this fails, the entity is silently dropped.
+
+Supports 9 PII types:
+  Full names, Email addresses, Phone numbers, Company names,
+  Physical/mailing addresses, SSNs, Credit card numbers,
+  Dates of birth, IP addresses.
 """
 
-import re
-from dataclasses import dataclass, field
+from .recognizers import (
+    DetectedEntity,
+    EmailRecognizer,
+    PhoneRecognizer,
+    SSNRecognizer,
+    CreditCardRecognizer,
+    IPAddressRecognizer,
+    URLRecognizer,
+    PersonRecognizer,
+    CompanyRecognizer,
+    AddressRecognizer,
+    DOBRecognizer,
+)
+from .section_detector import detect_sections
 
 
-@dataclass
-class DetectedEntity:
-    """Raw detected PII entity before pseudonymization."""
-    type: str
-    value: str
-    start: int
-    end: int
-    confidence: float
-    context: str = ""
+# Structured recognizers run first and produce protected spans
+STRUCTURED_RECOGNIZERS = [
+    URLRecognizer(),       # URLs first (not PII, but protect from PERSON)
+    EmailRecognizer(),
+    PhoneRecognizer(),
+    SSNRecognizer(),
+    CreditCardRecognizer(),
+    IPAddressRecognizer(),
+]
+
+# Contextual recognizers run second, with section + protected span awareness
+CONTEXTUAL_RECOGNIZERS = [
+    PersonRecognizer(),
+    CompanyRecognizer(),
+    AddressRecognizer(),
+    DOBRecognizer(),
+]
+
+# Entity types that are NOT emitted as PII (only used for protection)
+_PROTECTION_ONLY_TYPES = {"URL"}
 
 
-# ──────────────────────────────────────────────
-# Regex patterns for each PII type
-# ──────────────────────────────────────────────
+def _resolve_overlaps(entities: list[DetectedEntity]) -> list[DetectedEntity]:
+    """
+    Deterministic overlap resolution.
 
-PATTERNS: dict[str, list[tuple[re.Pattern, float]]] = {
-    "EMAIL": [
-        (re.compile(
-            r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b'
-        ), 0.99),
-    ],
-    "SSN": [
-        # Standard format: 123-45-6789
-        (re.compile(
-            r'\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b'
-        ), 0.95),
-        # No dashes: 123456789 (only in context)
-        (re.compile(
-            r'\b(?!000|666|9\d{2})\d{3}(?!00)\d{2}(?!0000)\d{4}\b'
-        ), 0.60),
-    ],
-    "CREDIT_CARD": [
-        # Visa
-        (re.compile(r'\b4\d{3}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b'), 0.95),
-        # Mastercard
-        (re.compile(r'\b5[1-5]\d{2}[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b'), 0.95),
-        # Amex
-        (re.compile(r'\b3[47]\d{2}[\s\-]?\d{6}[\s\-]?\d{5}\b'), 0.95),
-        # Discover
-        (re.compile(r'\b6(?:011|5\d{2})[\s\-]?\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b'), 0.95),
-        # Generic 16-digit
-        (re.compile(r'\b\d{4}[\s\-]\d{4}[\s\-]\d{4}[\s\-]\d{4}\b'), 0.80),
-    ],
-    "PHONE": [
-        # US format: (555) 867-5309 or 555-867-5309 or +1-555-867-5309
-        (re.compile(
-            r'(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}\b'
-        ), 0.92),
-        # International format
-        (re.compile(
-            r'\+\d{1,3}[\s\-.]?\(?\d{1,4}\)?[\s\-.]?\d{3,4}[\s\-.]?\d{3,4}\b'
-        ), 0.85),
-    ],
-    "IP_ADDRESS": [
-        # IPv4
-        (re.compile(
-            r'\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b'
-        ), 0.97),
-        # IPv6 (simplified)
-        (re.compile(
-            r'\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b'
-        ), 0.95),
-    ],
-    "DOB": [
-        # MM/DD/YYYY or MM-DD-YYYY
-        (re.compile(
-            r'\b(?:0[1-9]|1[0-2])[/\-](?:0[1-9]|[12]\d|3[01])[/\-](?:19|20)\d{2}\b'
-        ), 0.80),
-        # YYYY-MM-DD (ISO)
-        (re.compile(
-            r'\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b'
-        ), 0.80),
-        # Month DD, YYYY (e.g., January 15, 1990)
-        (re.compile(
-            r'\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+(?:19|20)\d{2}\b',
-            re.IGNORECASE
-        ), 0.85),
-        # DD Month YYYY
-        (re.compile(
-            r'\b\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+(?:19|20)\d{2}\b',
-            re.IGNORECASE
-        ), 0.85),
-    ],
-    "ADDRESS": [
-        # US street address: 123 Main St, City, ST 12345
-        (re.compile(
-            r'\b\d{1,5}\s+(?:[A-Z][a-z]+\s?){1,4}'
-            r'(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Drive|Dr\.?|'
-            r'Lane|Ln\.?|Road|Rd\.?|Way|Court|Ct\.?|Circle|Cir\.?|'
-            r'Place|Pl\.?|Terrace|Ter\.?|Trail|Trl\.?|Parkway|Pkwy\.?)'
-            r'(?:\s*,?\s*(?:[A-Z][a-z]+\s?){1,3})?'
-            r'(?:\s*,?\s*[A-Z]{2}\s+\d{5}(?:-\d{4})?)?',
-            re.MULTILINE
-        ), 0.82),
-        # PO Box
-        (re.compile(
-            r'\bP\.?O\.?\s*Box\s+\d+\b', re.IGNORECASE
-        ), 0.90),
-    ],
-    "PERSON": [
-        # Title + Name pattern: Mr./Mrs./Dr./Prof. First Last
-        (re.compile(
-            r'\b(?:Mr\.?|Mrs\.?|Ms\.?|Dr\.?|Prof\.?)\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}\b'
-        ), 0.90),
-        # Two or three capitalized words (generic name pattern)
-        (re.compile(
-            r'\b[A-Z][a-z]{1,15}\s+(?:[A-Z]\.?\s+)?[A-Z][a-z]{1,15}\b'
-        ), 0.65),
-    ],
-    "COMPANY": [
-        # Company with suffix: Inc., LLC, Corp., Ltd., etc.
-        (re.compile(
-            r'\b(?:[A-Z][A-Za-z&\'\-]*\s*){1,5}'
-            r'(?:Inc\.?|LLC|L\.L\.C\.?|Corp\.?|Corporation|'
-            r'Ltd\.?|Limited|Co\.?|Company|Group|Holdings|'
-            r'Partners|Associates|Enterprises|International|'
-            r'Technologies|Solutions|Services|Industries|Systems)\b'
-        ), 0.88),
-    ],
-}
-
-# Context keywords that boost confidence for ambiguous patterns
-CONTEXT_BOOSTERS: dict[str, list[str]] = {
-    "PERSON": ["name", "named", "contact", "employee", "mr", "mrs", "ms", "dr", "prof",
-               "sir", "madam", "patient", "client", "applicant", "defendant", "plaintiff",
-               "witness", "subject", "recipient", "sender", "author", "signed", "behalf"],
-    "DOB": ["born", "birth", "birthday", "dob", "date of birth", "age", "birthdate",
-            "born on", "d.o.b", "natal"],
-    "SSN": ["ssn", "social security", "social", "ss#", "ss #", "tax id", "taxpayer",
-            "social security number", "ein"],
-    "CREDIT_CARD": ["card", "credit", "debit", "visa", "mastercard", "amex",
-                    "american express", "discover", "payment", "account number",
-                    "card number", "cc#", "cc #"],
-    "PHONE": ["phone", "call", "tel", "telephone", "mobile", "cell", "fax",
-              "contact number", "reach", "dial"],
-    "ADDRESS": ["address", "street", "avenue", "boulevard", "road", "city",
-                "state", "zip", "postal", "mailing", "residence", "located",
-                "lives at", "resides"],
-    "EMAIL": ["email", "e-mail", "mail", "contact", "send", "write to", "reach"],
-    "IP_ADDRESS": ["ip", "address", "server", "host", "network", "connection",
-                   "logged from", "accessed from"],
-    "COMPANY": ["company", "corporation", "employer", "organization", "firm",
-                "business", "enterprise", "works at", "employed by"],
-}
-
-# How much context boosts confidence
-CONTEXT_BOOST = 0.10
-MAX_CONFIDENCE = 1.0
-
-
-def _get_context(text: str, start: int, end: int, window: int = 80) -> str:
-    """Extract surrounding context for a match."""
-    ctx_start = max(0, start - window)
-    ctx_end = min(len(text), end + window)
-    return text[ctx_start:ctx_end]
-
-
-def _check_context_boost(text: str, start: int, end: int, entity_type: str) -> float:
-    """Check if surrounding context contains keywords that boost confidence."""
-    context = _get_context(text, start, end, window=120).lower()
-    boosters = CONTEXT_BOOSTERS.get(entity_type, [])
-    for keyword in boosters:
-        if keyword in context:
-            return CONTEXT_BOOST
-    return 0.0
-
-
-def _luhn_check(number: str) -> bool:
-    """Validate a credit card number using the Luhn algorithm."""
-    digits = [int(d) for d in number if d.isdigit()]
-    if len(digits) < 13 or len(digits) > 19:
-        return False
-    checksum = 0
-    reverse_digits = digits[::-1]
-    for i, d in enumerate(reverse_digits):
-        if i % 2 == 1:
-            d *= 2
-            if d > 9:
-                d -= 9
-        checksum += d
-    return checksum % 10 == 0
-
-
-def _remove_overlapping(entities: list[DetectedEntity]) -> list[DetectedEntity]:
-    """Remove overlapping entities, keeping the one with higher confidence."""
+    Rules:
+    1. Sort by start position
+    2. For overlapping entities, prefer:
+       a. Longer span (more specific match)
+       b. Higher confidence
+       c. First encountered (stable ordering)
+    3. Never allow overlapping replacements
+    """
     if not entities:
         return []
 
-    # Sort by start position, then by confidence (descending)
-    sorted_entities = sorted(entities, key=lambda e: (e.start, -e.confidence))
-    result = [sorted_entities[0]]
+    # Sort by start, then by length descending, then by confidence descending
+    sorted_entities = sorted(
+        entities,
+        key=lambda e: (e.start, -(e.end - e.start), -e.confidence),
+    )
+
+    result: list[DetectedEntity] = [sorted_entities[0]]
 
     for entity in sorted_entities[1:]:
         last = result[-1]
-        # Check for overlap
         if entity.start < last.end:
-            # Keep the one with higher confidence
-            if entity.confidence > last.confidence:
+            # Overlap — keep the one with the longer span
+            last_len = last.end - last.start
+            this_len = entity.end - entity.start
+            if this_len > last_len:
                 result[-1] = entity
+            elif this_len == last_len and entity.confidence > last.confidence:
+                result[-1] = entity
+            # Otherwise keep `last`
         else:
             result.append(entity)
 
     return result
+
+
+def _verify_spans(text: str, entities: list[DetectedEntity]) -> list[DetectedEntity]:
+    """
+    Verify that text[start:end] == entity.value for every entity.
+    Drop any entity where this invariant is violated.
+    """
+    verified = []
+    for entity in entities:
+        actual = text[entity.start:entity.end]
+        if actual == entity.value:
+            verified.append(entity)
+        else:
+            # Try to find the actual text nearby (within 5 chars)
+            # This handles minor offset drift
+            pass  # Silently drop — the span is broken
+    return verified
 
 
 def detect_pii(text: str) -> list[DetectedEntity]:
@@ -227,61 +130,47 @@ def detect_pii(text: str) -> list[DetectedEntity]:
     Detect all PII entities in the given text.
 
     Returns a list of DetectedEntity objects sorted by position,
-    with overlapping entities resolved.
+    with overlapping entities resolved and spans verified.
     """
-    all_entities: list[DetectedEntity] = []
+    # Phase 1: Section detection
+    sections = detect_sections(text)
 
-    for entity_type, patterns in PATTERNS.items():
-        for pattern, base_confidence in patterns:
-            for match in pattern.finditer(text):
-                value = match.group().strip()
-                start = match.start()
-                end = match.end()
+    # Phase 2: Structured PII detection
+    structured_entities: list[DetectedEntity] = []
+    for recognizer in STRUCTURED_RECOGNIZERS:
+        structured_entities.extend(
+            recognizer.detect(text, protected_spans=None, sections=sections)
+        )
 
-                # Skip very short matches that are likely false positives
-                if len(value) < 2:
-                    continue
+    # Build protected spans from structured detections
+    protected_spans: list[tuple[int, int]] = [
+        (e.start, e.end) for e in structured_entities
+    ]
 
-                # Apply context boost
-                context_boost = _check_context_boost(text, start, end, entity_type)
-                confidence = min(base_confidence + context_boost, MAX_CONFIDENCE)
+    # Phase 3: Context-aware PII detection
+    contextual_entities: list[DetectedEntity] = []
+    for recognizer in CONTEXTUAL_RECOGNIZERS:
+        contextual_entities.extend(
+            recognizer.detect(
+                text,
+                protected_spans=protected_spans,
+                sections=sections,
+            )
+        )
 
-                # Extra validation for credit cards
-                if entity_type == "CREDIT_CARD":
-                    clean_number = re.sub(r'[\s\-]', '', value)
-                    if not _luhn_check(clean_number):
-                        confidence *= 0.5  # Penalize invalid Luhn
+    # Combine all entities (excluding protection-only types like URL)
+    all_entities = [
+        e for e in structured_entities
+        if e.type not in _PROTECTION_ONLY_TYPES
+    ] + contextual_entities
 
-                # Extra validation for PERSON to reduce false positives
-                if entity_type == "PERSON":
-                    # Skip common words that look like names
-                    common_words = {
-                        "The", "This", "That", "These", "Those", "Your", "Dear",
-                        "Best Regards", "Kind Regards", "Thank You", "Dear Sir",
-                        "Please Note", "For Example", "In Addition", "As Such",
-                        "New York", "San Francisco", "Los Angeles", "Las Vegas",
-                        "United States", "South Carolina", "North Carolina",
-                        "New Jersey", "New Hampshire", "West Virginia",
-                    }
-                    if value in common_words:
-                        continue
+    # Phase 4: Overlap resolution
+    resolved = _resolve_overlaps(all_entities)
 
-                context = _get_context(text, start, end)
-
-                all_entities.append(DetectedEntity(
-                    type=entity_type,
-                    value=value,
-                    start=start,
-                    end=end,
-                    confidence=round(confidence, 2),
-                    context=context,
-                ))
-
-    # Remove overlapping entities
-    resolved = _remove_overlapping(all_entities)
+    # Phase 5: Span verification
+    verified = _verify_spans(text, resolved)
 
     # Sort by position
-    resolved.sort(key=lambda e: e.start)
+    verified.sort(key=lambda e: e.start)
 
-    return resolved
-
+    return verified

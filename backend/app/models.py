@@ -16,6 +16,7 @@ class PIIEntity(BaseModel):
     start: int  # character offset in text
     end: int  # character offset in text
     context: Optional[str] = None  # surrounding text for review
+    recognizer: Optional[str] = None  # which recognizer produced this entity
 
 
 class RedactionStats(BaseModel):

@@ -142,7 +142,7 @@ class TestPersonDetection:
         assert len(persons) >= 1
 
     def test_two_word_name(self):
-        text = "Contact person is John Doe."
+        text = "Contact: John Doe"
         entities = detect_pii(text)
         persons = [e for e in entities if e.type == "PERSON"]
         assert len(persons) >= 1

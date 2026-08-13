@@ -47,8 +47,8 @@ class Pseudonymizer:
         Returns:
             A realistic synthetic replacement string
         """
-        # Check cache for consistency
-        cache_key = f"{entity_type}:{original}"
+        # Normalize cache key for consistency
+        cache_key = f"{entity_type}:{original.strip().lower()}"
         if cache_key in self._cache:
             return self._cache[cache_key]
 
@@ -95,7 +95,9 @@ class Pseudonymizer:
     def _gen_phone(self, original: str) -> str:
         """Generate a synthetic phone number matching the original format."""
         # Detect format
-        if original.startswith('+'):
+        if original.startswith('+91'):
+            return f"+91-{fake.numerify('##########')}"
+        elif original.startswith('+'):
             return f"+1-{fake.numerify('###')}-{fake.numerify('###')}-{fake.numerify('####')}"
         elif '(' in original:
             return f"({fake.numerify('###')}) {fake.numerify('###')}-{fake.numerify('####')}"
