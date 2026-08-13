@@ -222,3 +222,66 @@ def _remove_overlapping(entities: list[DetectedEntity]) -> list[DetectedEntity]:
     return result
 
 
+def detect_pii(text: str) -> list[DetectedEntity]:
+    """
+    Detect all PII entities in the given text.
+
+    Returns a list of DetectedEntity objects sorted by position,
+    with overlapping entities resolved.
+    """
+    all_entities: list[DetectedEntity] = []
+
+    for entity_type, patterns in PATTERNS.items():
+        for pattern, base_confidence in patterns:
+            for match in pattern.finditer(text):
+                value = match.group().strip()
+                start = match.start()
+                end = match.end()
+
+                # Skip very short matches that are likely false positives
+                if len(value) < 2:
+                    continue
+
+                # Apply context boost
+                context_boost = _check_context_boost(text, start, end, entity_type)
+                confidence = min(base_confidence + context_boost, MAX_CONFIDENCE)
+
+                # Extra validation for credit cards
+                if entity_type == "CREDIT_CARD":
+                    clean_number = re.sub(r'[\s\-]', '', value)
+                    if not _luhn_check(clean_number):
+                        confidence *= 0.5  # Penalize invalid Luhn
+
+                # Extra validation for PERSON to reduce false positives
+                if entity_type == "PERSON":
+                    # Skip common words that look like names
+                    common_words = {
+                        "The", "This", "That", "These", "Those", "Your", "Dear",
+                        "Best Regards", "Kind Regards", "Thank You", "Dear Sir",
+                        "Please Note", "For Example", "In Addition", "As Such",
+                        "New York", "San Francisco", "Los Angeles", "Las Vegas",
+                        "United States", "South Carolina", "North Carolina",
+                        "New Jersey", "New Hampshire", "West Virginia",
+                    }
+                    if value in common_words:
+                        continue
+
+                context = _get_context(text, start, end)
+
+                all_entities.append(DetectedEntity(
+                    type=entity_type,
+                    value=value,
+                    start=start,
+                    end=end,
+                    confidence=round(confidence, 2),
+                    context=context,
+                ))
+
+    # Remove overlapping entities
+    resolved = _remove_overlapping(all_entities)
+
+    # Sort by position
+    resolved.sort(key=lambda e: e.start)
+
+    return resolved
+
