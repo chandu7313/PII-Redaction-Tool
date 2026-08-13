@@ -36,3 +36,9 @@ class RedactionResult(BaseModel):
     stats: RedactionStats
 
 
+class RedactionRequest(BaseModel):
+    """Request to commit redactions with optional entity overrides."""
+    job_id: str
+    entities: list[PIIEntity]
+
+
