@@ -214,3 +214,34 @@ export default function RedactionPage() {
         {/* Error */}
         {error && (
           <div className="mx-4 mt-4 border-2 border-stamp-red bg-error-container p-3 font-code text-code-sm text-on-error-container">
+            <span className="material-symbols-outlined text-sm mr-2 align-middle">error</span>
+            {error}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="absolute bottom-4 right-4 flex gap-4">
+          <button
+            className="border-2 border-ink px-6 py-2 font-label text-label-caps font-bold bg-fresh-paper hover:bg-ink hover:text-fresh-paper transition-colors"
+            onClick={() => navigate('/')}
+          >
+            BACK TO INTAKE
+          </button>
+          <button
+            className="border-2 border-stamp-red px-6 py-2 font-label text-label-caps font-bold bg-fresh-paper text-stamp-red hover:bg-stamp-red hover:text-fresh-paper transition-colors shadow-[2px_2px_0px_#A63D2F] active:translate-y-0.5 active:shadow-[0px_0px_0px_#A63D2F]"
+            onClick={handleCommit}
+            disabled={isCommitting || entities.length === 0}
+          >
+            {isCommitting ? (
+              <>
+                <span className="cursor-blink mr-1">█</span>
+                COMMITTING...
+              </>
+            ) : (
+              'COMMIT REDACTIONS'
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Stats footer */}
