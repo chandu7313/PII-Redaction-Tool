@@ -120,3 +120,17 @@ class TestDOBDetection:
         assert len(dobs) == 1
 
 
+class TestAddressDetection:
+    def test_street_address(self):
+        text = "Located at 1234 Elm Street, Springfield, IL 62704"
+        entities = detect_pii(text)
+        addresses = [e for e in entities if e.type == "ADDRESS"]
+        assert len(addresses) >= 1
+
+    def test_po_box(self):
+        text = "Mail to P.O. Box 1234"
+        entities = detect_pii(text)
+        addresses = [e for e in entities if e.type == "ADDRESS"]
+        assert len(addresses) == 1
+
+
