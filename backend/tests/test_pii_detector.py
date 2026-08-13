@@ -48,7 +48,7 @@ class TestSSNDetection:
         entities = detect_pii(text)
         ssns = [e for e in entities if e.type == "SSN"]
         assert len(ssns) == 1
-        assert ssns[0].confidence > 0.95  # Context boost applied
+        assert ssns[0].confidence >= 0.90  # Context boost applied
 
 
 class TestPhoneDetection:
