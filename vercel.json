@@ -1,10 +1,21 @@
 {
   "framework": "vite",
+  "build": {
+    "env": {
+      "UV_NO_CACHE": "1",
+      "PIP_NO_CACHE_DIR": "1"
+    }
+  },
   "buildCommand": "cd frontend && npm install && npm run build && rm -rf node_modules",
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/**/*.py": {
-      "excludeFiles": "{frontend,tests}/**"
+      "excludeFiles": [
+        "frontend/**",
+        "**/node_modules/**",
+        "node_modules/**",
+        "**/*.docx"
+      ]
     }
   },
   "rewrites": [
