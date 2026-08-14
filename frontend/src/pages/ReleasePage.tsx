@@ -46,7 +46,7 @@ export default function ReleasePage() {
   }
 
   // Build a highlighted version of original text showing redacted spans
-  const renderHighlightedText = (text: string, isOriginal: boolean) => {
+  const renderHighlightedText = (text: string) => {
     if (!data.entities || data.entities.length === 0) {
       return <p className="font-body text-body-md whitespace-pre-wrap">{text}</p>;
     }
@@ -87,7 +87,7 @@ export default function ReleasePage() {
             <h3 className="font-headline text-headline-md text-center mb-6 border-b border-outline pb-2 w-full">
               ORIGINAL
             </h3>
-            {renderHighlightedText(data.original_text, true)}
+            {renderHighlightedText(data.original_text)}
           </div>
 
           {/* Center crease */}
@@ -98,7 +98,7 @@ export default function ReleasePage() {
             <h3 className="font-headline text-headline-md text-center mb-6 border-b border-outline pb-2 w-full">
               REDACTED COPY
             </h3>
-            {renderHighlightedText(data.redacted_text, false)}
+            {renderHighlightedText(data.redacted_text)}
           </div>
         </div>
 
