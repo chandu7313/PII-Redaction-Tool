@@ -11,9 +11,6 @@
   "functions": {
     "api/index.py": {
       "excludeFiles": "frontend/**"
-    },
-    "api/**/*.py": {
-      "excludeFiles": "frontend/**"
     }
   },
   "rewrites": [
