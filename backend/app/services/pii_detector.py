@@ -31,7 +31,7 @@ class DetectedEntity:
 
 
 # Entity types that are NOT emitted as PII (only used for protection)
-_PROTECTION_ONLY_TYPES = {"URL"}
+_PROTECTION_ONLY_TYPES = set()
 
 # Sections where PERSON/ORG detection from spaCy should be heavily suppressed
 _SUPPRESSED_SECTIONS = {
@@ -189,6 +189,8 @@ def detect_pii(text: str) -> list[DetectedEntity]:
     # Process structured (auto-approve unless they overlap each other, which overlap resolver handles)
     for res in structured_candidates:
         if res.entity_type in _PROTECTION_ONLY_TYPES:
+            continue
+        if res.score < 0.85:
             continue
         validated_entities.append(DetectedEntity(
             type=res.entity_type,

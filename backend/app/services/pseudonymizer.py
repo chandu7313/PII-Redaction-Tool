@@ -68,6 +68,7 @@ class Pseudonymizer:
             "IP_ADDRESS": self._gen_ip,
             "COMPANY": self._gen_company,
             "ADDRESS": self._gen_address,
+            "URL": self._gen_url,
         }
 
         generator = generators.get(entity_type)
@@ -158,6 +159,21 @@ class Pseudonymizer:
         if re.match(r'P\.?O\.?\s*Box', original, re.IGNORECASE):
             return f"P.O. Box {random.randint(100, 9999)}"
         return fake.address().replace('\n', ', ')
+
+    def _gen_url(self, original: str) -> str:
+        """Generate a synthetic URL by replacing the username/path segment."""
+        # Split by / to find the last path segment (which is usually the username for github/linkedin)
+        parts = original.rstrip('/').split('/')
+        
+        # Don't modify the domain itself (e.g. "github.com") if there's no path
+        if len(parts) <= 1 or (len(parts) == 3 and parts[0].startswith('http')):
+            return original
+            
+        fake_username = fake.user_name()
+        # Replace the last segment with a fake username
+        parts[-1] = fake_username
+        
+        return "/".join(parts)
 
     def reset(self):
         """Clear the cache and counters for a new session."""
