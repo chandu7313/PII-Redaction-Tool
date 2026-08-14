@@ -9,13 +9,11 @@
   "buildCommand": "cd frontend && npm install && npm run build && rm -rf node_modules",
   "outputDirectory": "frontend/dist",
   "functions": {
+    "api/index.py": {
+      "excludeFiles": "frontend/**"
+    },
     "api/**/*.py": {
-      "excludeFiles": [
-        "frontend/**",
-        "**/node_modules/**",
-        "node_modules/**",
-        "**/*.docx"
-      ]
+      "excludeFiles": "frontend/**"
     }
   },
   "rewrites": [
