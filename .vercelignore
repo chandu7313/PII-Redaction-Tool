@@ -1,0 +1,25 @@
+# Ignore local virtual environments
+venv/
+**/venv/
+.venv/
+**/.venv/
+
+# Ignore frontend build files and dependencies
+node_modules/
+**/node_modules/
+
+# Ignore Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+**/*.pyc
+
+# Ignore mac OS files
+.DS_Store
+**/.DS_Store
+
+# Ignore testing/evaluation data
+output/
+evaluation/
+*.docx
+**/*.docx
