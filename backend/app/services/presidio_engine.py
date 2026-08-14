@@ -46,24 +46,26 @@ def get_analyzer_engine() -> AnalyzerEngine:
         [(r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b', 0.99)]
     )
     
-    # 2. PHONE (Indian + US)
+    # 2. PHONE (Indian + US + International)
     phone_rec = _create_custom_recognizer(
         "PHONE", "phone_regex",
         [
-            (r'(?<!\d)(?:\+?91[\s\-.]?)?(?:\(?0?\)?[\s\-.]?)?[6-9]\d{9}(?!\d)', 0.90),
-            (r'(?<!\d)(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}(?!\d)', 0.90),
+            (r'(?<!\d)(?:\+?91[\s\-.]?)?(?:\(?0?\)?[\s\-.]?)?[6-9]\d{9}(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)', 0.90),
+            (r'(?<!\d)(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)', 0.90),
+            (r'\b(?:\+?\d{1,3}\.)?\d{3,5}\.\d{4,5}\b', 0.85),
         ],
         context=["phone", "mobile", "cell", "tel", "telephone", "contact", "call", "whatsapp"]
     )
     
-    # 3. SSN
+    # 3. SSN & NATIONAL_ID
     ssn_rec = _create_custom_recognizer(
         "SSN", "ssn_regex",
         [
             (r'\b(?!000|666|9\d{2})\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b', 0.92),
             (r'\b(?!000|666|9\d{2})\d{3}(?!00)\d{2}(?!0000)\d{4}\b', 0.50),
+            (r'\b\d{4}\s\d{4}\s\d{4}\b', 0.95), # Aadhaar
         ],
-        context=["ssn", "social security", "ss#", "tax id"]
+        context=["ssn", "social security", "ss#", "tax id", "aadhaar", "national id"]
     )
     
     # 4. CREDIT CARD (Simplified patterns; Luhn validation happens later)
@@ -115,13 +117,12 @@ def get_analyzer_engine() -> AnalyzerEngine:
         "ADDRESS", "address_pattern",
         [
             (r'\b\d{1,5}[ \t]+(?:[A-Z][a-z]+[ \t]*){1,4}'
-             r'(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Drive|Dr\.?|'
+             r'\b(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Drive|Dr\.?|'
              r'Lane|Ln\.?|Road|Rd\.?|Way|Court|Ct\.?|Circle|Cir\.?|'
-             r'Place|Pl\.?|Terrace|Ter\.?|Trail|Trl\.?|Parkway|Pkwy\.?)'
+             r'Place|Pl\.?|Terrace|Ter\.?|Trail|Trl\.?|Parkway|Pkwy\.?)\b'
              r'(?:[ \t]*,?[ \t]*(?:Suite|Ste\.?|Apt\.?|Unit|#)[ \t]*\d+)?'
-             r'(?:[ \t]*,[ \t]*[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)*)?'
-             r'(?:[ \t]*,[ \t]*[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?)?', 0.88),
-            (r'\bP\.?O\.?[ \t]*Box[ \t]+\d+\b', 0.88),
+             r'(?:[ \t]*,[ \t]*[A-Za-z0-9\s]+)*', 0.88),
+            (r'\bP\.?O\.?[ \t]*Box[ \t]+\d+(?:[ \t]*,[ \t]*[A-Za-z0-9\s]+)*', 0.88),
         ]
     )
     

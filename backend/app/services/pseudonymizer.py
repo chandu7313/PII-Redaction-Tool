@@ -108,7 +108,10 @@ class Pseudonymizer:
             return f"{fake.numerify('###')}-{fake.numerify('###')}-{fake.numerify('####')}"
 
     def _gen_ssn(self, original: str) -> str:
-        """Generate a synthetic SSN."""
+        """Generate a synthetic SSN or National ID."""
+        if len(original.replace(' ', '').replace('-', '')) == 12:
+            # Aadhaar style
+            return f"{fake.numerify('####')} {fake.numerify('####')} {fake.numerify('####')}"
         if '-' in original:
             return fake.ssn()
         else:
@@ -158,6 +161,25 @@ class Pseudonymizer:
         """Generate a synthetic address."""
         if re.match(r'P\.?O\.?\s*Box', original, re.IGNORECASE):
             return f"P.O. Box {random.randint(100, 9999)}"
+            
+        orig_lower = original.lower()
+        if 'india' in orig_lower or 'bengaluru' in orig_lower or re.search(r'\b\d{6}\b', original):
+            # Generate Indian style fake address
+            city = fake.city()
+            state = fake.state()
+            pin = fake.numerify('######')
+            street = fake.street_name()
+            bldg = random.randint(1, 999)
+            return f"{bldg} {street}, {city}, {state} {pin}, India"
+            
+        if 'uk' in orig_lower or 'united kingdom' in orig_lower or 'london' in orig_lower or re.search(r'\b[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}\b', original, re.IGNORECASE):
+            # Generate UK style fake address
+            city = fake.city()
+            street = fake.street_name()
+            bldg = random.randint(1, 999)
+            postcode = fake.postcode()
+            return f"{bldg} {street}, {city}, {postcode}, United Kingdom"
+            
         return fake.address().replace('\n', ', ')
 
     def _gen_url(self, original: str) -> str:
