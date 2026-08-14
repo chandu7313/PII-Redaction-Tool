@@ -6,13 +6,9 @@ Maintains consistency: the same original value always maps to the same replaceme
 within a single redaction session.
 """
 
-from faker import Faker
 import random
 import re
 from typing import Optional
-
-fake = Faker()
-Faker.seed(0)
 
 
 class Pseudonymizer:
@@ -25,7 +21,6 @@ class Pseudonymizer:
 
     def __init__(self, seed: Optional[int] = None):
         if seed is not None:
-            Faker.seed(seed)
             random.seed(seed)
         self._cache: dict[str, str] = {}
         self._type_counters: dict[str, int] = {}
@@ -39,13 +34,6 @@ class Pseudonymizer:
     def generate_replacement(self, entity_type: str, original: str) -> str:
         """
         Generate a synthetic replacement for a PII entity.
-
-        Args:
-            entity_type: The type of PII (PERSON, EMAIL, PHONE, etc.)
-            original: The original PII value
-
-        Returns:
-            A realistic synthetic replacement string
         """
         # Normalize cache key for consistency
         cache_key = f"{entity_type}:{original.strip().lower()}"
@@ -80,48 +68,53 @@ class Pseudonymizer:
         return f"[{entity_type}_{counter}]"
 
     def _gen_person(self, original: str) -> str:
-        """Generate a synthetic person name."""
+        first = ["James", "John", "Robert", "Michael", "William", "David", "Richard", "Charles", "Joseph", "Thomas", "Mary", "Patricia", "Jennifer", "Linda", "Elizabeth", "Barbara", "Susan", "Jessica", "Sarah", "Karen"]
+        last = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson", "Thomas", "Taylor", "Moore", "Jackson", "Martin"]
         parts = original.split()
         if len(parts) >= 3:
-            return f"{fake.first_name()} {fake.first_name()[0]}. {fake.last_name()}"
+            return f"{random.choice(first)} {chr(random.randint(65, 90))}. {random.choice(last)}"
         elif len(parts) == 2:
-            return f"{fake.first_name()} {fake.last_name()}"
+            return f"{random.choice(first)} {random.choice(last)}"
         else:
-            return fake.first_name()
+            return random.choice(first)
 
     def _gen_email(self, original: str) -> str:
-        """Generate a synthetic email address."""
-        return fake.email()
+        names = ["alex", "taylor", "jordan", "casey", "morgan", "riley", "sam", "jamie"]
+        domains = ["example.com", "test.org", "sample.net", "demo.io"]
+        return f"{random.choice(names)}{random.randint(10,999)}@{random.choice(domains)}"
 
     def _gen_phone(self, original: str) -> str:
-        """Generate a synthetic phone number matching the original format."""
-        # Detect format
+        d = lambda: str(random.randint(0, 9))
+        n3 = lambda: "".join(d() for _ in range(3))
+        n4 = lambda: "".join(d() for _ in range(4))
+        
         if original.startswith('+91'):
-            return f"+91-{fake.numerify('##########')}"
+            return f"+91-9{n3()}{n3()}{n3()}"
         elif original.startswith('+'):
-            return f"+1-{fake.numerify('###')}-{fake.numerify('###')}-{fake.numerify('####')}"
+            return f"+1-{n3()}-{n3()}-{n4()}"
         elif '(' in original:
-            return f"({fake.numerify('###')}) {fake.numerify('###')}-{fake.numerify('####')}"
+            return f"({n3()}) {n3()}-{n4()}"
         elif '.' in original:
-            return f"{fake.numerify('###')}.{fake.numerify('###')}.{fake.numerify('####')}"
+            return f"{n3()}.{n3()}.{n4()}"
         else:
-            return f"{fake.numerify('###')}-{fake.numerify('###')}-{fake.numerify('####')}"
+            return f"{n3()}-{n3()}-{n4()}"
 
     def _gen_ssn(self, original: str) -> str:
-        """Generate a synthetic SSN or National ID."""
+        d = lambda: str(random.randint(0, 9))
+        n4 = lambda: "".join(d() for _ in range(4))
+        
         if len(original.replace(' ', '').replace('-', '')) == 12:
-            # Aadhaar style
-            return f"{fake.numerify('####')} {fake.numerify('####')} {fake.numerify('####')}"
+            return f"{n4()} {n4()} {n4()}"
         if '-' in original:
-            return fake.ssn()
+            return f"{d()}{d()}{d()}-{d()}{d()}-{n4()}"
         else:
-            return fake.ssn().replace('-', '')
+            return f"{d()}{d()}{d()}{d()}{d()}{n4()}"
 
     def _gen_credit_card(self, original: str) -> str:
-        """Generate a synthetic credit card number matching format."""
-        number = fake.credit_card_number(card_type='visa16')
-        # Match original formatting
-        clean_original = re.sub(r'[\s\-]', '', original)
+        d = lambda: str(random.randint(0, 9))
+        n4 = lambda: "".join(d() for _ in range(4))
+        number = f"4{n4()[1:]}{n4()}{n4()}{n4()}"
+        
         if '-' in original:
             return f"{number[:4]}-{number[4:8]}-{number[8:12]}-{number[12:16]}"
         elif ' ' in original:
@@ -129,72 +122,52 @@ class Pseudonymizer:
         return number
 
     def _gen_dob(self, original: str) -> str:
-        """Generate a synthetic date of birth matching format."""
-        dob = fake.date_of_birth(minimum_age=18, maximum_age=90)
-
-        # Detect format
+        y = random.randint(1950, 2005)
+        m = random.randint(1, 12)
+        d = random.randint(1, 28)
+        months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        
         if re.match(r'\d{4}-\d{2}-\d{2}', original):
-            return dob.strftime('%Y-%m-%d')
+            return f"{y:04d}-{m:02d}-{d:02d}"
         elif re.match(r'\d{2}/\d{2}/\d{4}', original):
-            return dob.strftime('%m/%d/%Y')
+            return f"{m:02d}/{d:02d}/{y:04d}"
         elif re.match(r'\d{2}-\d{2}-\d{4}', original):
-            return dob.strftime('%m-%d-%Y')
+            return f"{m:02d}-{d:02d}-{y:04d}"
         elif re.match(r'[A-Za-z]+\s+\d', original):
-            return dob.strftime('%B %d, %Y')
+            return f"{months[m-1]} {d:02d}, {y:04d}"
         elif re.match(r'\d{1,2}\s+[A-Za-z]+', original):
-            return dob.strftime('%d %B %Y')
+            return f"{d:02d} {months[m-1]} {y:04d}"
         else:
-            return dob.strftime('%m/%d/%Y')
+            return f"{m:02d}/{d:02d}/{y:04d}"
 
     def _gen_ip(self, original: str) -> str:
-        """Generate a synthetic IP address."""
         if ':' in original:
-            # IPv6
-            return fake.ipv6()
-        return fake.ipv4()
+            return ":".join(f"{random.randint(0, 65535):x}" for _ in range(8))
+        return ".".join(str(random.randint(1, 254)) for _ in range(4))
 
     def _gen_company(self, original: str) -> str:
-        """Generate a synthetic company name."""
-        return fake.company()
+        prefixes = ["Acme", "Globex", "Initech", "Soylent", "Massive", "Apex", "Zenith", "Quantum"]
+        suffixes = ["Corp", "Inc", "LLC", "Ltd", "Solutions", "Technologies", "Enterprises"]
+        return f"{random.choice(prefixes)} {random.choice(suffixes)}"
 
     def _gen_address(self, original: str) -> str:
-        """Generate a synthetic address."""
         if re.match(r'P\.?O\.?\s*Box', original, re.IGNORECASE):
             return f"P.O. Box {random.randint(100, 9999)}"
             
         orig_lower = original.lower()
         if 'india' in orig_lower or 'bengaluru' in orig_lower or re.search(r'\b\d{6}\b', original):
-            # Generate Indian style fake address
-            city = fake.city()
-            state = fake.state()
-            pin = fake.numerify('######')
-            street = fake.street_name()
-            bldg = random.randint(1, 999)
-            return f"{bldg} {street}, {city}, {state} {pin}, India"
+            return f"{random.randint(1, 999)} Main Street, Bangalore, Karnataka {random.randint(500000, 599999)}, India"
             
         if 'uk' in orig_lower or 'united kingdom' in orig_lower or 'london' in orig_lower or re.search(r'\b[A-Z]{1,2}\d[A-Z\d]? \d[A-Z]{2}\b', original, re.IGNORECASE):
-            # Generate UK style fake address
-            city = fake.city()
-            street = fake.street_name()
-            bldg = random.randint(1, 999)
-            postcode = fake.postcode()
-            return f"{bldg} {street}, {city}, {postcode}, United Kingdom"
+            return f"{random.randint(1, 999)} High Street, London, SW1A 1AA, United Kingdom"
             
-        return fake.address().replace('\n', ', ')
+        return f"{random.randint(1, 999)} Maple Ave, Springfield, IL {random.randint(10000, 99999)}"
 
     def _gen_url(self, original: str) -> str:
-        """Generate a synthetic URL by replacing the username/path segment."""
-        # Split by / to find the last path segment (which is usually the username for github/linkedin)
         parts = original.rstrip('/').split('/')
-        
-        # Don't modify the domain itself (e.g. "github.com") if there's no path
         if len(parts) <= 1 or (len(parts) == 3 and parts[0].startswith('http')):
             return original
-            
-        fake_username = fake.user_name()
-        # Replace the last segment with a fake username
-        parts[-1] = fake_username
-        
+        parts[-1] = f"user{random.randint(1000, 9999)}"
         return "/".join(parts)
 
     def reset(self):
