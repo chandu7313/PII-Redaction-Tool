@@ -1,25 +1,8 @@
 {
   "framework": "vite",
-  "build": {
-    "env": {
-      "UV_NO_CACHE": "1",
-      "PIP_NO_CACHE_DIR": "1",
-      "PYTHONDONTWRITEBYTECODE": "1",
-      "UV_COMPILE_BYTECODE": "0"
-    }
-  },
   "buildCommand": "cd frontend && npm install && npm run build && rm -rf node_modules",
   "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/index.py": {
-      "excludeFiles": "{frontend/**,**/*.docx,**/tests/**,**/test/**,**/*.c,**/*.cpp,**/*.h,**/*.pyx,**/*.pxd,**/*.pyc,**/__pycache__/**,venv/**,.venv/**}"
-    }
-  },
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
