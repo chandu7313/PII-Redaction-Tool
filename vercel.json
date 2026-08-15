@@ -12,7 +12,7 @@
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/index.py": {
-      "excludeFiles": "frontend/**"
+      "excludeFiles": "{frontend/**,**/*.docx,**/tests/**,**/test/**,**/*.c,**/*.cpp,**/*.h,**/*.pyx,**/*.pxd,**/*.pyc,**/__pycache__/**,venv/**,.venv/**}"
     }
   },
   "rewrites": [
