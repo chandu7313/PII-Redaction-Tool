@@ -222,7 +222,34 @@ def _validate_company_candidate(text: str, result: RecognizerResult) -> float:
     )
     if not suffix_pattern.search(value):
         return 0.0
-        
+
+    # Trim leading non-company context words (verbs, prepositions, articles, etc.)
+    # that spaCy's NER may have included in the ORG span.
+    # Walk forward through words until we hit a capitalized word that is NOT
+    # a common context word.
+    _context_words = {
+        "employed", "by", "at", "for", "with", "from", "of", "the", "a", "an",
+        "vendor", "contract", "held", "consulting", "engagement", "working",
+        "works", "worked", "joined", "joining", "hired", "founded",
+        "managed", "managing", "led", "leading",
+        "in", "to", "and", "or", "on", "as",
+    }
+    tokens = value.split()
+    trim_count = 0
+    for token in tokens:
+        # If it's a lowercase word or a common context word (case-insensitive), trim it
+        if token.lower() in _context_words or (token[0].islower() if token else False):
+            trim_count += 1
+        else:
+            break
+
+    if trim_count > 0 and trim_count < len(tokens):
+        # Recalculate span start
+        trimmed_text = " ".join(tokens[trim_count:])
+        new_start = result.start + value.index(tokens[trim_count])
+        result.start = new_start
+        value = text[result.start:result.end]
+
     return result.score
 
 
@@ -320,7 +347,7 @@ def detect_pii(text: str) -> list[DetectedEntity]:
 
         elif res.entity_type == "DATE" or res.entity_type == "DATE_TIME":
             ctx = _get_context(text, res.start, res.end).lower()
-            if not any(re.search(rf'\b{kw}\b', ctx) for kw in ["dob", "birth", "born"]):
+            if not any(re.search(rf'\b{kw}\b', ctx) for kw in ["dob", "d.o.b", "birth", "born", "birthday", "birthdate"]):
                 final_score = 0.0
             else:
                 res.entity_type = "DOB"
@@ -349,6 +376,54 @@ def detect_pii(text: str) -> list[DetectedEntity]:
                 context=_get_context(text, res.start, res.end),
                 recognizer="presidio"
             ))
+
+    # 4b. Bug A fallback: detect names on short lines that spaCy NER missed.
+    # This catches bare "Firstname Lastname" patterns on lines ≤60 chars
+    # (typical of table cells) outside suppressed sections.
+    _short_name_re = re.compile(
+        r'^[ \t]*([A-Z][a-z]{1,15}(?:[ \t]+[A-Z][a-z]{1,15}){1,2})[ \t]*$',
+        re.MULTILINE,
+    )
+    for m in _short_name_re.finditer(text):
+        value = m.group(1).strip()
+        start = m.start(1)
+        end = m.end(1)
+        # Check line length
+        line_start = text.rfind('\n', 0, m.start()) + 1
+        line_end = text.find('\n', m.end())
+        if line_end == -1:
+            line_end = len(text)
+        line = text[line_start:line_end]
+        if len(line.strip()) > 60:
+            continue
+        if _is_in_protected_span(start, end, protected_spans):
+            continue
+        if _is_in_suppressed_section(start, sections):
+            continue
+        # Don't duplicate if already found
+        if any(e.start == start and e.end == end for e in validated_entities):
+            continue
+        validated_entities.append(DetectedEntity(
+            type="PERSON",
+            value=value,
+            start=start,
+            end=end,
+            confidence=0.85,
+            context=_get_context(text, start, end),
+            recognizer="person_short_line"
+        ))
+
+    # 4c. Bug E: extend DOB spans backward to include ordinal day prefix.
+    # If a DOB like "March 1994" was detected by spaCy but the original text
+    # has "14th March 1994", extend the span to cover the ordinal.
+    _ordinal_prefix = re.compile(r'\d{1,2}(?:st|nd|rd|th)\s+$', re.IGNORECASE)
+    for entity in validated_entities:
+        if entity.type == "DOB":
+            prefix_region = text[max(0, entity.start - 10):entity.start]
+            om = _ordinal_prefix.search(prefix_region)
+            if om:
+                entity.start = entity.start - (len(prefix_region) - om.start())
+                entity.value = text[entity.start:entity.end]
 
     # 5. Overlap resolution
     resolved = _resolve_overlaps(validated_entities)

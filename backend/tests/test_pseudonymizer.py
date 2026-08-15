@@ -135,3 +135,72 @@ class TestSessionReset:
         # But at minimum, the cache should be cleared
         assert len(pseudonymizer._cache) == 0
 
+
+# ─────────────────────────────────────────────────────────
+# Round 3 regression tests
+# ─────────────────────────────────────────────────────────
+
+class TestBugE_OrdinalDOBReplacement:
+    """Bug E: Ordinal DOB replacement must produce a coherent ordinal date."""
+
+    def test_ordinal_dob_14th(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("DOB", "14th March 1994")
+        # Must contain an ordinal suffix and be a single coherent date
+        assert any(s in result for s in ["st", "nd", "rd", "th"]), (
+            f"No ordinal suffix in DOB replacement: '{result}'"
+        )
+        # Must NOT contain the original "14th" or "March" or "1994"
+        assert "14th" not in result
+        assert "March" not in result
+        assert "1994" not in result
+
+    def test_ordinal_dob_3rd_short_month(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("DOB", "3rd Nov 2001")
+        assert any(s in result for s in ["st", "nd", "rd", "th"])
+        assert "3rd" not in result
+        assert "2001" not in result
+
+    def test_numeric_dob_no_ordinal(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("DOB", "07/22/1988")
+        assert "/" in result
+        assert len(result) == 10  # MM/DD/YYYY
+
+
+class TestBugF_IPAddressRFC5737:
+    """Bug F: Public IPs must use RFC 5737 TEST-NET ranges; private IPs must stay private."""
+
+    _rfc5737_prefixes = ("192.0.2.", "198.51.100.", "203.0.113.")
+
+    def test_public_ip_uses_test_net(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("IP_ADDRESS", "8.8.8.8")
+        assert any(result.startswith(p) for p in self._rfc5737_prefixes), (
+            f"Public IP replacement not in TEST-NET range: '{result}'"
+        )
+
+    def test_public_ip_another(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("IP_ADDRESS", "175.109.153.17")
+        assert any(result.startswith(p) for p in self._rfc5737_prefixes), (
+            f"Public IP replacement not in TEST-NET range: '{result}'"
+        )
+
+    def test_private_10x_stays_private(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("IP_ADDRESS", "10.0.4.19")
+        assert result.startswith("10."), (
+            f"10.x.x.x private IP replaced with non-10.x: '{result}'"
+        )
+
+    def test_private_172x_stays_private(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("IP_ADDRESS", "172.16.0.1")
+        assert result.startswith("172."), (
+            f"172.16.x.x private IP replaced with non-172.x: '{result}'"
+        )
+        second_octet = int(result.split('.')[1])
+        assert 16 <= second_octet <= 31, (
+            f"172.x.x.x second octet out of private range: {second_octet}"
+        )
+
+    def test_private_192168_stays_private(self, pseudonymizer):
+        result = pseudonymizer.generate_replacement("IP_ADDRESS", "192.168.1.100")
+        assert result.startswith("192.168."), (
+            f"192.168.x.x private IP replaced with non-192.168.x: '{result}'"
+        )

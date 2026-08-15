@@ -87,17 +87,32 @@ class Pseudonymizer:
         d = lambda: str(random.randint(0, 9))
         n3 = lambda: "".join(d() for _ in range(3))
         n4 = lambda: "".join(d() for _ in range(4))
-        
-        if original.startswith('+91'):
-            return f"+91-9{n3()}{n3()}{n3()}"
-        elif original.startswith('+'):
-            return f"+1-{n3()}-{n3()}-{n4()}"
-        elif '(' in original:
-            return f"({n3()}) {n3()}-{n4()}"
-        elif '.' in original:
-            return f"{n3()}.{n3()}.{n4()}"
+
+        # Extract extension suffix if present
+        ext_match = re.search(r'\s*(ext\.?|x|extension)\s*(\d{1,5})$', original, re.IGNORECASE)
+        ext_suffix = ""
+        base = original
+        if ext_match:
+            base = original[:ext_match.start()]
+            ext_label = ext_match.group(1)
+            ext_suffix = f" {ext_label} {random.randint(100, 999)}"
+
+        # Generate base phone number
+        if base.startswith('+91'):
+            result = f"+91-9{n3()}{n3()}{n3()}"
+        elif base.startswith('+'):
+            result = f"+1-{n3()}-{n3()}-{n4()}"
+        elif '(' in base:
+            result = f"({n3()}) {n3()}-{n4()}"
+        elif '.' in base:
+            result = f"{n3()}.{n3()}.{n4()}"
+        elif re.match(r'^0\d{2,4}[\s\-]', base):
+            # Indian landline: 0XX-XXXX-XXXX
+            result = f"0{d()}{d()}-{n4()}-{n4()}"
         else:
-            return f"{n3()}-{n3()}-{n4()}"
+            result = f"{n3()}-{n3()}-{n4()}"
+
+        return result + ext_suffix
 
     def _gen_ssn(self, original: str) -> str:
         d = lambda: str(random.randint(0, 9))
@@ -126,13 +141,28 @@ class Pseudonymizer:
         m = random.randint(1, 12)
         d = random.randint(1, 28)
         months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-        
+        # Short month names for abbreviated formats
+        short_months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+        def _ordinal(n: int) -> str:
+            """Return day with ordinal suffix: 1st, 2nd, 3rd, 4th..."""
+            if 11 <= n <= 13:
+                return f"{n}th"
+            return f"{n}{['th','st','nd','rd'][n % 10] if n % 10 < 4 else 'th'}"
+
         if re.match(r'\d{4}-\d{2}-\d{2}', original):
             return f"{y:04d}-{m:02d}-{d:02d}"
         elif re.match(r'\d{2}/\d{2}/\d{4}', original):
             return f"{m:02d}/{d:02d}/{y:04d}"
         elif re.match(r'\d{2}-\d{2}-\d{4}', original):
             return f"{m:02d}-{d:02d}-{y:04d}"
+        elif re.match(r'\d{1,2}(?:st|nd|rd|th)\s+[A-Za-z]+', original, re.IGNORECASE):
+            # Ordinal day + month: "14th March 1994" or "3rd Nov 2001"
+            # Check if short month name was used
+            month_match = re.search(r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b', original)
+            if month_match and len(month_match.group(1)) <= 3:
+                return f"{_ordinal(d)} {short_months[m-1]} {y:04d}"
+            return f"{_ordinal(d)} {months[m-1]} {y:04d}"
         elif re.match(r'[A-Za-z]+\s+\d', original):
             return f"{months[m-1]} {d:02d}, {y:04d}"
         elif re.match(r'\d{1,2}\s+[A-Za-z]+', original):
@@ -143,7 +173,40 @@ class Pseudonymizer:
     def _gen_ip(self, original: str) -> str:
         if ':' in original:
             return ":".join(f"{random.randint(0, 65535):x}" for _ in range(8))
-        return ".".join(str(random.randint(1, 254)) for _ in range(4))
+
+        # Parse original octets to determine if private or public
+        octets = original.split('.')
+        if len(octets) == 4:
+            try:
+                o1, o2 = int(octets[0]), int(octets[1])
+            except ValueError:
+                o1, o2 = 0, 0
+
+            # Check RFC 1918 private ranges
+            is_private = (
+                o1 == 10  # 10.0.0.0/8
+                or (o1 == 172 and 16 <= o2 <= 31)  # 172.16.0.0/12
+                or (o1 == 192 and o2 == 168)  # 192.168.0.0/16
+            )
+
+            if is_private:
+                # Generate replacement in the SAME private range
+                if o1 == 10:
+                    return f"10.{random.randint(0,255)}.{random.randint(0,254)}.{random.randint(1,254)}"
+                elif o1 == 172:
+                    return f"172.{random.randint(16,31)}.{random.randint(0,254)}.{random.randint(1,254)}"
+                else:
+                    return f"192.168.{random.randint(0,254)}.{random.randint(1,254)}"
+
+        # Public IP → RFC 5737 TEST-NET ranges
+        # 192.0.2.0/24 (TEST-NET-1), 198.51.100.0/24 (TEST-NET-2), 203.0.113.0/24 (TEST-NET-3)
+        test_nets = [
+            ("192.0.2", ),
+            ("198.51.100", ),
+            ("203.0.113", ),
+        ]
+        prefix = random.choice(test_nets)[0]
+        return f"{prefix}.{random.randint(1, 254)}"
 
     def _gen_company(self, original: str) -> str:
         prefixes = ["Acme", "Globex", "Initech", "Soylent", "Massive", "Apex", "Zenith", "Quantum"]

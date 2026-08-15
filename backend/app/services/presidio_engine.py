@@ -64,12 +64,13 @@ def get_analyzer_engine() -> AnalyzerEngine:
         [(r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b', 0.99)]
     )
     
-    # 2. PHONE (Indian + US + International)
+    # 2. PHONE (Indian mobile + US + Indian landline + International)
     phone_rec = _create_custom_recognizer(
         "PHONE", "phone_regex",
         [
             (r'(?<!\d)(?:\+?91[\s\-.]?)?(?:\(?0?\)?[\s\-.]?)?[6-9]\d{9}(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)', 0.90),
             (r'(?<!\d)(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)', 0.90),
+            (r'(?<!\d)0\d{2,4}[\s\-.]?\d{4}[\s\-.]?\d{4}(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)', 0.88),
             (r'\b(?:\+?\d{1,3}\.)?\d{3,5}\.\d{4,5}\b', 0.85),
         ],
         context=["phone", "mobile", "cell", "tel", "telephone", "contact", "call", "whatsapp"]
@@ -134,13 +135,17 @@ def get_analyzer_engine() -> AnalyzerEngine:
     address_rec = _create_custom_recognizer(
         "ADDRESS", "address_pattern",
         [
-            (r'\b\d{1,5}[ \t]+(?:[A-Z][a-z]+[ \t]*){1,4}'
-             r'\b(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Drive|Dr\.?|'
+            (r'\b\d{1,5}[A-Za-z]?[ \t]+(?:[A-Z][a-z]+[ \t]*){1,4}'
+             r'(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Drive|Dr\.?|'
              r'Lane|Ln\.?|Road|Rd\.?|Way|Court|Ct\.?|Circle|Cir\.?|'
-             r'Place|Pl\.?|Terrace|Ter\.?|Trail|Trl\.?|Parkway|Pkwy\.?)\b'
+             r'Place|Pl\.?|Terrace|Ter\.?|Trail|Trl\.?|Parkway|Pkwy\.?)'
              r'(?:[ \t]*,?[ \t]*(?:Suite|Ste\.?|Apt\.?|Unit|#)[ \t]*\d+)?'
-             r'(?:[ \t]*,[ \t]*[A-Za-z0-9\s]+)*', 0.88),
-            (r'\bP\.?O\.?[ \t]*Box[ \t]+\d+(?:[ \t]*,[ \t]*[A-Za-z0-9\s]+)*', 0.88),
+             r'(?:[ \t]*,[ \t]*(?![A-Z]{1,2}\d)(?![A-Z]{2}[ \t]+\d)(?:[A-Za-z][A-Za-z ]*[A-Za-z]))*'
+             r'(?:[ \t]*,?[ \t]*[A-Z]{1,2}\d[A-Z\d]?[ \t]+\d[A-Z]{2})?'
+             r'(?:[ \t]*,?[ \t]*[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?)?'
+             r'(?:[ \t]*,?[ \t]*\d{6})?'
+             r'(?:[ \t]*,[ \t]*[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)*)?', 0.88),
+            (r'\bP\.?O\.?[ \t]*Box[ \t]+\d+(?:[ \t]*,[ \t]*[A-Za-z][A-Za-z \t]*)*', 0.88),
         ]
     )
     
@@ -150,6 +155,9 @@ def get_analyzer_engine() -> AnalyzerEngine:
         [
             (r'\b(?:0[1-9]|1[0-2])[/\-](?:0[1-9]|[12]\d|3[01])[/\-](?:19|20)\d{2}\b', 0.50),
             (r'\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b', 0.50),
+            (r'\b\d{1,2}(?:st|nd|rd|th)[ \t]+(?:January|February|March|April|May|June|July|August|'
+             r'September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
+             r',?[ \t]+(?:19|20)\d{2}\b', 0.50),
         ],
         context=["dob", "birth", "born", "birthday"]
     )

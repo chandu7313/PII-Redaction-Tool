@@ -98,14 +98,22 @@ class PhoneRecognizer(BaseRecognizer):
     recognizer_name = "phone_regex"
 
     _patterns = [
-        # Indian: +91-XXXXXXXXXX or +91 XXXXXXXXXX or 91-XXXXXXXXXX
+        # Indian mobile: +91-XXXXXXXXXX or +91 XXXXXXXXXX or 91-XXXXXXXXXX
         (re.compile(
-            r'(?<!\d)(?:\+?91[\s\-.]?)?(?:\(?0?\)?[\s\-.]?)?[6-9]\d{9}(?!\d)'
+            r'(?<!\d)(?:\+?91[\s\-.]?)?(?:\(?0?\)?[\s\-.]?)?[6-9]\d{9}'
+            r'(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)'
         ), 0.90, "indian_phone"),
         # US: (555) 867-5309 or 555-867-5309 or +1-555-867-5309
         (re.compile(
-            r'(?<!\d)(?:\+?1[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}(?!\d)'
+            r'(?<!\d)(?:\+?1[\s\-.]?)?'
+            r'\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}'
+            r'(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)'
         ), 0.90, "us_phone"),
+        # Indian landline: 080-2345-6789 or 044-2345-6789 (STD code + number)
+        (re.compile(
+            r'(?<!\d)0\d{2,4}[\s\-.]?\d{4}[\s\-.]?\d{4}'
+            r'(?:\s*(?:ext\.?|x|extension)\s*\d{1,5})?(?!\d)'
+        ), 0.88, "indian_landline"),
     ]
 
     # Context keywords that boost confidence
@@ -454,6 +462,38 @@ class PersonRecognizer(BaseRecognizer):
                     recognizer="person_title",
                 ))
 
+        # Strategy 4: Short-line name fallback (catches names in table cells
+        # that spaCy NER misses). Only on short lines (≤60 chars), outside
+        # suppressed sections, that look like bare "Firstname Lastname".
+        _short_name_re = re.compile(
+            r'^[ \t]*([A-Z][a-z]{1,15}(?:[ \t]+[A-Z][a-z]{1,15}){1,2})[ \t]*$',
+            re.MULTILINE,
+        )
+        for m in _short_name_re.finditer(text):
+            line_start = text.rfind('\n', 0, m.start()) + 1
+            line_end = text.find('\n', m.end())
+            if line_end == -1:
+                line_end = len(text)
+            line = text[line_start:line_end]
+            if len(line.strip()) > 60:
+                continue
+            value = m.group(1).strip()
+            start = m.start(1)
+            end = m.end(1)
+            if self._is_in_protected_span(start, end, protected_spans):
+                continue
+            if self._is_in_suppressed_section(start, section_map):
+                continue
+            # Don't duplicate if already found
+            if any(e.start == start and e.end == end for e in entities):
+                continue
+            entities.append(DetectedEntity(
+                type=self.entity_type, value=value,
+                start=start, end=end, confidence=0.85,
+                context=self._get_context(text, start, end),
+                recognizer="person_short_line",
+            ))
+
         return entities
 
     def _is_in_suppressed_section(self, pos: int, sections: list) -> bool:
@@ -508,15 +548,24 @@ class AddressRecognizer(BaseRecognizer):
     entity_type = "ADDRESS"
     recognizer_name = "address_pattern"
 
-    # Street address: "123 Main Street" or "456 Oak Ave, Suite 200"
+    # Street address: "123 Main Street" or "221B Baker Street, London, NW1 6XE, United Kingdom"
     _street_pattern = re.compile(
-        r'\b\d{1,5}[ \t]+(?:[A-Z][a-z]+[ \t]*){1,4}'
+        r'\b\d{1,5}[A-Za-z]?[ \t]+(?:[A-Z][a-z]+[ \t]*){1,4}'
         r'(?:Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Drive|Dr\.?|'
         r'Lane|Ln\.?|Road|Rd\.?|Way|Court|Ct\.?|Circle|Cir\.?|'
         r'Place|Pl\.?|Terrace|Ter\.?|Trail|Trl\.?|Parkway|Pkwy\.?)'
         r'(?:[ \t]*,?[ \t]*(?:Suite|Ste\.?|Apt\.?|Unit|#)[ \t]*\d+)?'
-        r'(?:[ \t]*,[ \t]*[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)*)?'
-        r'(?:[ \t]*,[ \t]*[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?)?',
+        # City/region: greedy, but skip UK postcodes (1-2 uppercase + digit)
+        # and US state codes (exactly 2 uppercase followed by space + digits)
+        r'(?:[ \t]*,[ \t]*(?![A-Z]{1,2}\d)(?![A-Z]{2}[ \t]+\d)(?:[A-Za-z][A-Za-z ]*[A-Za-z]))*'
+        # UK postcode: NW1 6XE
+        r'(?:[ \t]*,?[ \t]*[A-Z]{1,2}\d[A-Z\d]?[ \t]+\d[A-Z]{2})?'
+        # US state + ZIP: IL 62704 or CA 90210-1234
+        r'(?:[ \t]*,?[ \t]*[A-Z]{2}[ \t]+\d{5}(?:-\d{4})?)?'
+        # Indian PIN: 560001
+        r'(?:[ \t]*,?[ \t]*\d{6})?'
+        # Country: United Kingdom
+        r'(?:[ \t]*,[ \t]*[A-Z][a-z]+(?:[ \t]+[A-Z][a-z]+)*)?',
         re.MULTILINE,
     )
 
@@ -591,13 +640,20 @@ class DOBRecognizer(BaseRecognizer):
         re.compile(
             r'\b(?:19|20)\d{2}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])\b'
         ),
-        # Month DD, YYYY
+        # Month DD, YYYY (with optional ordinal suffix)
         re.compile(
             r'\b(?:January|February|March|April|May|June|July|August|'
-            r'September|October|November|December)[ \t]+\d{1,2},?[ \t]+(?:19|20)\d{2}\b',
+            r'September|October|November|December)[ \t]+\d{1,2}(?:st|nd|rd|th)?,?[ \t]+(?:19|20)\d{2}\b',
             re.IGNORECASE,
         ),
-        # DD Month YYYY
+        # DDth Month YYYY (ordinal day + month + year)
+        re.compile(
+            r'\b\d{1,2}(?:st|nd|rd|th)[ \t]+(?:January|February|March|April|May|June|July|August|'
+            r'September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)'
+            r',?[ \t]+(?:19|20)\d{2}\b',
+            re.IGNORECASE,
+        ),
+        # DD Month YYYY (no ordinal)
         re.compile(
             r'\b\d{1,2}[ \t]+(?:January|February|March|April|May|June|July|August|'
             r'September|October|November|December),?[ \t]+(?:19|20)\d{2}\b',

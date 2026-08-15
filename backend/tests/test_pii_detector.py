@@ -202,3 +202,125 @@ class TestEdgeCases:
         assert "PHONE" in types_found
         assert "IP_ADDRESS" in types_found
 
+
+# ─────────────────────────────────────────────────────────
+# Round 3 regression tests
+# ─────────────────────────────────────────────────────────
+
+class TestBugA_TableNameDetection:
+    """Bug A: Both names in a two-row table must be detected, not just one."""
+
+    def test_both_table_names_detected(self):
+        # Simulates extracted table text: short lines with bare names
+        text = (
+            "Employee Records\n"
+            "Kavya Nair\n"
+            "Software Engineer\n"
+            "Imran Qureshi\n"
+            "Data Analyst\n"
+        )
+        entities = detect_pii(text)
+        person_values = [e.value for e in entities if e.type == "PERSON"]
+        assert "Kavya Nair" in person_values, (
+            f"Kavya Nair not detected. Found: {person_values}"
+        )
+        assert "Imran Qureshi" in person_values, (
+            f"Imran Qureshi not detected. Found: {person_values}"
+        )
+
+
+class TestBugB_ExtensionPhone:
+    """Bug B: Landline phone with extension must be fully detected."""
+
+    def test_landline_with_extension(self):
+        text = "Office phone: 080-2345-6789 ext. 214"
+        entities = detect_pii(text)
+        phones = [e for e in entities if e.type == "PHONE"]
+        assert len(phones) >= 1, f"No phone detected in: {text}"
+        # The match must include the extension part
+        matched = phones[0].value
+        assert "ext" in matched.lower(), (
+            f"Extension not included in match: '{matched}'"
+        )
+        assert "214" in matched, (
+            f"Extension digits not included in match: '{matched}'"
+        )
+
+    def test_landline_with_x_extension(self):
+        text = "Tel: 044-2567-8901 x 100"
+        entities = detect_pii(text)
+        phones = [e for e in entities if e.type == "PHONE"]
+        assert len(phones) >= 1
+
+
+class TestBugC_CompanySpanBoundary:
+    """Bug C: Company spans must not include leading verbs/prepositions."""
+
+    def test_employed_by_prefix(self):
+        text = "Employed by Acme Technologies Pvt Ltd for 5 years."
+        entities = detect_pii(text)
+        companies = [e for e in entities if e.type == "COMPANY"]
+        assert len(companies) >= 1
+        company_val = companies[0].value
+        assert "Employed" not in company_val, (
+            f"Leading context leaked into company span: '{company_val}'"
+        )
+        assert "Acme" in company_val
+
+    def test_vendor_contract_prefix(self):
+        text = "Vendor contract held with Sethand Associates LLP since 2020."
+        entities = detect_pii(text)
+        companies = [e for e in entities if e.type == "COMPANY"]
+        assert len(companies) >= 1
+        company_val = companies[0].value
+        assert "Vendor" not in company_val
+        assert "contract" not in company_val
+        assert "Sethand" in company_val
+
+    def test_consulting_engagement_prefix(self):
+        text = "Consulting engagement with Northfield Labs Inc began in Q3."
+        entities = detect_pii(text)
+        companies = [e for e in entities if e.type == "COMPANY"]
+        assert len(companies) >= 1
+        company_val = companies[0].value
+        assert "Consulting" not in company_val
+        assert "Northfield" in company_val
+
+
+class TestBugD_FullAddressDetection:
+    """Bug D: Full international addresses must be captured as one span."""
+
+    def test_uk_address_full_capture(self):
+        text = "Address: 221B Baker Street, London, NW1 6XE, United Kingdom"
+        entities = detect_pii(text)
+        addresses = [e for e in entities if e.type == "ADDRESS"]
+        assert len(addresses) >= 1
+        addr = addresses[0].value
+        assert "221B" in addr, f"House number leaked: '{addr}'"
+        assert "Baker Street" in addr, f"Street name not captured: '{addr}'"
+        assert "NW1 6XE" in addr, f"Postal code not captured: '{addr}'"
+
+
+class TestBugE_OrdinalDOBDetection:
+    """Bug E: Ordinal-prefixed dates must be fully captured as one span."""
+
+    def test_ordinal_dob_14th(self):
+        text = "Date of birth: 14th March 1994"
+        entities = detect_pii(text)
+        dobs = [e for e in entities if e.type == "DOB"]
+        assert len(dobs) == 1, f"Expected 1 DOB, got {len(dobs)}: {[e.value for e in dobs]}"
+        assert dobs[0].value == "14th March 1994"
+
+    def test_ordinal_dob_3rd(self):
+        text = "Born on 3rd Nov 2001 in Mumbai."
+        entities = detect_pii(text)
+        dobs = [e for e in entities if e.type == "DOB"]
+        assert len(dobs) == 1
+        assert dobs[0].value == "3rd Nov 2001"
+
+    def test_numeric_dob_unchanged(self):
+        text = "DOB: 07/22/1988"
+        entities = detect_pii(text)
+        dobs = [e for e in entities if e.type == "DOB"]
+        assert len(dobs) == 1
+        assert dobs[0].value == "07/22/1988"
