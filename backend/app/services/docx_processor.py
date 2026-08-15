@@ -7,6 +7,7 @@ redacted DOCX documents while preserving formatting.
 
 from docx import Document
 from docx.shared import RGBColor
+import docx
 import copy
 import io
 import re
@@ -98,6 +99,25 @@ def create_redacted_docx(
             for paragraph in section.footer.paragraphs:
                 _replace_in_paragraph(paragraph, sorted_replacements)
 
+    # Redact hyperlink target URLs (href) across all parts
+    def _redact_rels_in_part(part):
+        for rel in part.rels.values():
+            if rel.reltype == docx.opc.constants.RELATIONSHIP_TYPE.HYPERLINK:
+                target = rel.target_ref
+                if target:
+                    new_target = target
+                    for original, replacement in sorted_replacements:
+                        new_target = new_target.replace(original, replacement)
+                    if new_target != target:
+                        rel._target = new_target
+
+    _redact_rels_in_part(doc.part)
+    for section in doc.sections:
+        if section.header:
+            _redact_rels_in_part(section.header.part)
+        if section.footer:
+            _redact_rels_in_part(section.footer.part)
+
     # Save to bytes
     output = io.BytesIO()
     doc.save(output)
@@ -133,7 +153,10 @@ def _replace_in_paragraph(
         return
 
     # Build a map of character positions to runs
-    runs = paragraph.runs
+    # Use XPath to find all w:r elements, including those nested in w:hyperlink
+    from docx.text.run import Run
+    runs_xml = paragraph._p.xpath('.//w:r')
+    runs = [Run(r, paragraph) for r in runs_xml]
     if not runs:
         return
 
