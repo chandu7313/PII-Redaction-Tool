@@ -3,7 +3,9 @@
   "build": {
     "env": {
       "UV_NO_CACHE": "1",
-      "PIP_NO_CACHE_DIR": "1"
+      "PIP_NO_CACHE_DIR": "1",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "UV_COMPILE_BYTECODE": "0"
     }
   },
   "buildCommand": "cd frontend && npm install && npm run build && rm -rf node_modules",

@@ -1,5 +1,4 @@
 fastapi>=0.115.0
-uvicorn>=0.30.0
 python-docx>=1.1.0
 python-multipart>=0.0.9
 pydantic>=2.10.0
@@ -8,4 +7,3 @@ phonenumberslite>=8.12.0
 ./phonenumbers-8.99.9-py3-none-any.whl
 presidio-analyzer>=2.2.35
 spacy>=3.7.0
-https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

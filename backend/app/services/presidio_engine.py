@@ -24,13 +24,31 @@ def _create_custom_recognizer(entity_type: str, name: str, patterns: list[tuple[
     )
 
 
+import os
+import urllib.request
+import tarfile
+
+def _ensure_spacy_model():
+    model_dir = "/tmp/en_core_web_sm"
+    model_name_in_tar = "en_core_web_sm-3.8.0/en_core_web_sm/en_core_web_sm-3.8.0"
+    if not os.path.exists(model_dir):
+        tar_path = "/tmp/model.tar.gz"
+        url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0.tar.gz"
+        urllib.request.urlretrieve(url, tar_path)
+        with tarfile.open(tar_path, "r:gz") as tar:
+            tar.extractall(path="/tmp")
+        # Move it to expected dir
+        os.rename(os.path.join("/tmp", model_name_in_tar), model_dir)
+    return model_dir
+
 def get_analyzer_engine() -> AnalyzerEngine:
     """Initialize and return a configured Presidio AnalyzerEngine."""
+    model_path = _ensure_spacy_model()
     
     # Configure spaCy NLP engine
     configuration = {
         "nlp_engine_name": "spacy",
-        "models": [{"lang_code": "en", "model_name": "en_core_web_sm"}],
+        "models": [{"lang_code": "en", "model_name": model_path}],
     }
     provider = NlpEngineProvider(nlp_configuration=configuration)
     nlp_engine = provider.create_engine()
